@@ -4,219 +4,194 @@
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/UTType.h>
 #import "PKMultipartInputStream.h"
+#define kHeaderStringFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\n\r\n"
+#define kHeaderDataFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+#define kHeaderPathFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\nContent-Type: %@\r\n\r\n"
 
-#ifndef min
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
-@interface PKMultipartElement : NSObject
-{
-    @private
-    NSData        *headers;
-    NSInputStream *body;
-    NSUInteger    headersLength, bodyLength, length, delivered;
-}
-@end
-
-
-@implementation PKMultipartElement
-- (NSString *)mimeTypeForExtension:(NSString *)extension
-{
-    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (CFStringRef)extension, NULL);
+static NSString * MIMETypeForExtension(NSString * extension) {
+    
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)extension, NULL);
     if (uti != NULL)
     {
         CFStringRef mime = UTTypeCopyPreferredTagWithClass(uti, kUTTagClassMIMEType);
         CFRelease(uti);
         if (mime != NULL)
         {
-            NSString *type = [NSString stringWithString:(NSString *)mime];
+            NSString *type = [NSString stringWithString:(__bridge NSString *)mime];
             CFRelease(mime);
             return type;
         }
     }
     return @"application/octet-stream";
 }
+
+@interface PKMultipartElement : NSObject
+@property (nonatomic, strong) NSData *headers;
+@property (nonatomic, strong) NSInputStream *body;
+@property (nonatomic) NSUInteger headersLength, bodyLength, length, delivered;
+@end
+
+
+@implementation PKMultipartElement
 - (void)updateLength
 {
-    length = headersLength + bodyLength + 2;
-    [body open];
+    self.length = self.headersLength + self.bodyLength + 2;
+    [self.body open];
 } 
 - (id)initWithName:(NSString *)name boundary:(NSString *)boundary string:(NSString *)string
 {
-    [self init];
-    headers       = [[[NSString stringWithFormat:@"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\n\r\n", boundary, name] dataUsingEncoding:NSUTF8StringEncoding] retain];
-    headersLength = [headers length];
-    body          = [[NSInputStream inputStreamWithData:[string dataUsingEncoding:NSUTF8StringEncoding]] retain];
-    bodyLength    = [[string dataUsingEncoding:NSUTF8StringEncoding] length];
+    self = [super init];
+    self.headers       = [[NSString stringWithFormat:kHeaderStringFormat, boundary, name] dataUsingEncoding:NSUTF8StringEncoding];
+    self.headersLength = [self.headers length];
+    NSData *stringData = [string dataUsingEncoding:NSUTF8StringEncoding];
+    self.body          = [NSInputStream inputStreamWithData:stringData];
+    self.bodyLength    = stringData.length;
     [self updateLength];
     return self;
 }
 - (id)initWithName:(NSString *)name boundary:(NSString *)boundary data:(NSData *)data
 {
-    [self init];
-    headers       = [[[NSString stringWithFormat:@"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\nContent-Type: application/octet-stream\r\n\r\n", boundary, name] dataUsingEncoding:NSUTF8StringEncoding] retain];
-    headersLength = [headers length];
-    body          = [[NSInputStream inputStreamWithData:data] retain];
-    bodyLength    = [data length];
+    self = [super init];
+    self.headers       = [[NSString stringWithFormat:kHeaderDataFormat, boundary, name] dataUsingEncoding:NSUTF8StringEncoding];
+    self.headersLength = [self.headers length];
+    self.body          = [NSInputStream inputStreamWithData:data];
+    self.bodyLength    = [data length];
     [self updateLength];
     return self;
 }
-- (id)initWithName:(NSString *)name boundary:(NSString *)boundary path:(NSString *)path
+- (id)initWithName:(NSString *)name fileName:(NSString *)fileName boundary:(NSString *)boundary path:(NSString *)path
 {
-    headers       = [[[NSString stringWithFormat:@"--%@\r\nContent-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\nContent-Type: %@\r\n\r\n", boundary, name, [path lastPathComponent], [self mimeTypeForExtension:[path pathExtension]]] dataUsingEncoding:NSUTF8StringEncoding] retain];
-    headersLength = [headers length];
-    body          = [[NSInputStream inputStreamWithFileAtPath:path] retain];
-    bodyLength    = [[[[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL] objectForKey:NSFileSize] unsignedIntegerValue];
+    if(!fileName) fileName = path.lastPathComponent;
+    self.headers       = [[NSString stringWithFormat:kHeaderPathFormat, boundary, name, fileName, MIMETypeForExtension(path.pathExtension)] dataUsingEncoding:NSUTF8StringEncoding];
+    self.headersLength = [self.headers length];
+    self.body          = [NSInputStream inputStreamWithFileAtPath:path];
+    self.bodyLength    = [[[[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL] objectForKey:NSFileSize] unsignedIntegerValue];
     [self updateLength];
     return self;
-}
-- (NSUInteger)length
-{
-    return length;
 }
 - (NSUInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len
 {
     NSUInteger sent = 0, read;
 
-    if (delivered >= length)
-    {
+    if (self.delivered >= self.length)
         return 0;
-    }
-    if (delivered < headersLength && sent < len)
+    if (self.delivered < self.headersLength && sent < len)
     {
-        read       = min(headersLength - delivered, len - sent);
-        [headers getBytes:buffer + sent range:NSMakeRange(delivered, read)];
+        read       = MIN(self.headersLength - self.delivered, len - sent);
+        [self.headers getBytes:buffer + sent range:NSMakeRange(self.delivered, read)];
         sent      += read;
-        delivered += sent;
+        self.delivered += sent;
     }
-    while (delivered >= headersLength && delivered < (length - 2) && sent < len)
+    while (self.delivered >= self.headersLength && self.delivered < (self.length - 2) && sent < len)
     {
-        if ((read = [body read:buffer + sent maxLength:len - sent]) == 0)
+        if ((read = [self.body read:buffer + sent maxLength:len - sent]) == 0)
         {
             break;
         }
         sent      += read;
-        delivered += read;
+        self.delivered += read;
     }
-    if (delivered >= (length - 2) && sent < len)
+    if (self.delivered >= (self.length - 2) && sent < len)
     {
-        if (delivered == (length - 2))
+        if (self.delivered == (self.length - 2))
         {
             *(buffer + sent) = '\r';
-            sent ++; delivered ++;
+            sent ++; self.delivered ++;
         }
         *(buffer + sent) = '\n';
-        sent ++; delivered ++;
+        sent ++; self.delivered ++;
     }
     return sent;
 }
-- (void)dealloc
-{
-    [headers release], headers = nil;
-    [body close], [body release], body = nil;
-    [super dealloc];
-}
 @end
-
+@interface PKMultipartInputStream()
+@property (nonatomic, strong) NSMutableArray *parts;
+@property (nonatomic, strong) NSString *boundary;
+@property (nonatomic, strong) NSData *footer;
+@property (nonatomic) NSUInteger currentPart, delivered, length;
+@property (nonatomic) NSStreamStatus status;
+@end
+#define kFooterFormat @"--%@--\r\n"
 @implementation PKMultipartInputStream
 - (void)updateLength
 {
-    NSEnumerator       *enumerator;
-    PKMultipartElement *part;
-
-    length     = footerLength;
-    enumerator = [parts objectEnumerator];
-    while (part = [enumerator nextObject])
-    {
-        length += [part length];
-    }
+    self.length = self.footer.length + [[self.parts valueForKeyPath:@"@sum.length"] unsignedIntegerValue];
 }
 - (id)init
 {
-    if ((self = [super init]) == nil)
-    {
-        return nil;
+    self = [super init];
+    if(self) {
+        self.parts        = [NSMutableArray array];
+        self.boundary     = [[NSProcessInfo processInfo] globallyUniqueString];
+        self.footer       = [[NSString stringWithFormat:kFooterFormat, self.boundary] dataUsingEncoding:NSUTF8StringEncoding];
+        [self updateLength];        
     }
-    parts        = [[NSMutableArray arrayWithCapacity:1] retain];
-    boundary     = [[[NSProcessInfo processInfo] globallyUniqueString] retain];
-    footer       = [[[NSString stringWithFormat:@"--%@--\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding] retain];
-    footerLength = [footer length];
-    [self updateLength];
     return self;
-}
-- (void)dealloc
-{
-    [parts release], parts = nil;
-    [boundary release], boundary = nil;
-    [footer release], footer = nil;
-    [super dealloc];
 }
 - (void)addPartWithName:(NSString *)name string:(NSString *)string
 {
-    [parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:boundary string:string]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary string:string]];
     [self updateLength];
 }
 - (void)addPartWithName:(NSString *)name data:(NSData *)data
 {
-    [parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:boundary data:data]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary data:data]];
     [self updateLength];
 }
 - (void)addPartWithName:(NSString *)name path:(NSString *)path
 {
-    [parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:boundary path:path]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name fileName:nil boundary:self.boundary path:path]];
     [self updateLength];
 }
-- (NSString *)boundary
+
+- (void)addPartWithName:(NSString *)name fileName:(NSString *)fileName path:(NSString *)path
 {
-    return boundary;
-}
-- (NSUInteger)length
-{
-    return length;
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name fileName:fileName boundary:self.boundary path:path]];
+    [self updateLength];
 }
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len
 {
     NSUInteger sent = 0, read;
 
-    status = NSStreamStatusReading;
-    while (delivered < length && sent < len && currentPart < [parts count])
+    self.status = NSStreamStatusReading;
+    while (self.delivered < self.length && sent < len && self.currentPart < self.parts.count)
     {
-        if ((read = [[parts objectAtIndex:currentPart] read:buffer + sent maxLength:len - sent]) == 0)
+        if ((read = [[self.parts objectAtIndex:self.currentPart] read:(buffer + sent) maxLength:(len - sent)]) == 0)
         {
-            currentPart ++;
+            self.currentPart ++;
             continue;
         }
-        sent      += read;
-        delivered += read;
+        sent            += read;
+        self.delivered  += read;
     }
-    if (delivered >= (length - footerLength) && sent < len)
+    if (self.delivered >= (self.length - self.footer.length) && sent < len)
     {
-        read       = min(footerLength - (delivered - (length - footerLength)), len - sent);
-        [footer getBytes:buffer + sent range:NSMakeRange(delivered - (length - footerLength), read)];
+        read       = MIN(self.footer.length - (self.delivered - (self.length - self.footer.length)), len - sent);
+        [self.footer getBytes:buffer + sent range:NSMakeRange(self.delivered - (self.length - self.footer.length), read)];
         sent      += read;
-        delivered += read;
+        self.delivered += read;
     }
     return sent;
 }
 - (BOOL)hasBytesAvailable
 {
-    return delivered < length;
+    return self.delivered < self.length;
 }
 - (void)open
 {
-    status = NSStreamStatusOpen;
+    self.status = NSStreamStatusOpen;
 }
 - (void)close
 {
-    status = NSStreamStatusClosed;
+    self.status = NSStreamStatusClosed;
 }
 - (NSStreamStatus)streamStatus
 {
-    if (status != NSStreamStatusClosed && delivered >= length)
+    if (self.status != NSStreamStatusClosed && self.delivered >= self.length)
     {
-        status = NSStreamStatusAtEnd;
+        self.status = NSStreamStatusAtEnd;
     }
-    return status;
+    return self.status;
 }
 - (void)_scheduleInCFRunLoop:(NSRunLoop *)runLoop forMode:(id)mode {}
 - (void)_setCFClientFlags:(CFOptionFlags)flags callback:(CFReadStreamClientCallBack)callback context:(CFStreamClientContext)context {}
