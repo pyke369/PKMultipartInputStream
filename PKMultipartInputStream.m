@@ -7,9 +7,10 @@
 #define kHeaderStringFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\n\r\n"
 #define kHeaderDataFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\nContent-Type: application/octet-stream\r\n\r\n"
 #define kHeaderPathFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\nContent-Type: %@\r\n\r\n"
+#define kFooterFormat @"--%@--\r\n"
 
 static NSString * MIMETypeForExtension(NSString * extension) {
-    
+
     CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)extension, NULL);
     if (uti != NULL)
     {
@@ -31,16 +32,15 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 @property (nonatomic) NSUInteger headersLength, bodyLength, length, delivered;
 @end
 
-
 @implementation PKMultipartElement
 - (void)updateLength
 {
     self.length = self.headersLength + self.bodyLength + 2;
     [self.body open];
-} 
+}
 - (id)initWithName:(NSString *)name boundary:(NSString *)boundary string:(NSString *)string
 {
-    self = [super init];
+    self               = [super init];
     self.headers       = [[NSString stringWithFormat:kHeaderStringFormat, boundary, name] dataUsingEncoding:NSUTF8StringEncoding];
     self.headersLength = [self.headers length];
     NSData *stringData = [string dataUsingEncoding:NSUTF8StringEncoding];
@@ -51,7 +51,7 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 }
 - (id)initWithName:(NSString *)name boundary:(NSString *)boundary data:(NSData *)data
 {
-    self = [super init];
+    self               = [super init];
     self.headers       = [[NSString stringWithFormat:kHeaderDataFormat, boundary, name] dataUsingEncoding:NSUTF8StringEncoding];
     self.headersLength = [self.headers length];
     self.body          = [NSInputStream inputStreamWithData:data];
@@ -59,10 +59,13 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     [self updateLength];
     return self;
 }
-- (id)initWithName:(NSString *)name fileName:(NSString *)fileName boundary:(NSString *)boundary path:(NSString *)path
+- (id)initWithName:(NSString *)name filename:(NSString *)filename boundary:(NSString *)boundary path:(NSString *)path
 {
-    if(!fileName) fileName = path.lastPathComponent;
-    self.headers       = [[NSString stringWithFormat:kHeaderPathFormat, boundary, name, fileName, MIMETypeForExtension(path.pathExtension)] dataUsingEncoding:NSUTF8StringEncoding];
+    if (!filename)
+    {
+        filename = path.lastPathComponent;
+    }
+    self.headers       = [[NSString stringWithFormat:kHeaderPathFormat, boundary, name, filename, MIMETypeForExtension(path.pathExtension)] dataUsingEncoding:NSUTF8StringEncoding];
     self.headersLength = [self.headers length];
     self.body          = [NSInputStream inputStreamWithFileAtPath:path];
     self.bodyLength    = [[[[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL] objectForKey:NSFileSize] unsignedIntegerValue];
@@ -74,12 +77,14 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     NSUInteger sent = 0, read;
 
     if (self.delivered >= self.length)
+    {
         return 0;
+    }
     if (self.delivered < self.headersLength && sent < len)
     {
-        read       = MIN(self.headersLength - self.delivered, len - sent);
+        read            = MIN(self.headersLength - self.delivered, len - sent);
         [self.headers getBytes:buffer + sent range:NSMakeRange(self.delivered, read)];
-        sent      += read;
+        sent           += read;
         self.delivered += sent;
     }
     while (self.delivered >= self.headersLength && self.delivered < (self.length - 2) && sent < len)
@@ -88,7 +93,7 @@ static NSString * MIMETypeForExtension(NSString * extension) {
         {
             break;
         }
-        sent      += read;
+        sent           += read;
         self.delivered += read;
     }
     if (self.delivered >= (self.length - 2) && sent < len)
@@ -104,6 +109,7 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     return sent;
 }
 @end
+
 @interface PKMultipartInputStream()
 @property (nonatomic, strong) NSMutableArray *parts;
 @property (nonatomic, strong) NSString *boundary;
@@ -111,7 +117,7 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 @property (nonatomic) NSUInteger currentPart, delivered, length;
 @property (nonatomic) NSStreamStatus status;
 @end
-#define kFooterFormat @"--%@--\r\n"
+
 @implementation PKMultipartInputStream
 - (void)updateLength
 {
@@ -120,11 +126,12 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 - (id)init
 {
     self = [super init];
-    if(self) {
-        self.parts        = [NSMutableArray array];
-        self.boundary     = [[NSProcessInfo processInfo] globallyUniqueString];
-        self.footer       = [[NSString stringWithFormat:kFooterFormat, self.boundary] dataUsingEncoding:NSUTF8StringEncoding];
-        [self updateLength];        
+    if (self)
+    {
+        self.parts    = [NSMutableArray array];
+        self.boundary = [[NSProcessInfo processInfo] globallyUniqueString];
+        self.footer   = [[NSString stringWithFormat:kFooterFormat, self.boundary] dataUsingEncoding:NSUTF8StringEncoding];
+        [self updateLength];
     }
     return self;
 }
@@ -140,13 +147,13 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 }
 - (void)addPartWithName:(NSString *)name path:(NSString *)path
 {
-    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name fileName:nil boundary:self.boundary path:path]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:nil boundary:self.boundary path:path]];
     [self updateLength];
 }
 
-- (void)addPartWithName:(NSString *)name fileName:(NSString *)fileName path:(NSString *)path
+- (void)addPartWithName:(NSString *)name filename:(NSString *)filename path:(NSString *)path
 {
-    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name fileName:fileName boundary:self.boundary path:path]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:filename boundary:self.boundary path:path]];
     [self updateLength];
 }
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len
@@ -166,9 +173,9 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     }
     if (self.delivered >= (self.length - self.footer.length) && sent < len)
     {
-        read       = MIN(self.footer.length - (self.delivered - (self.length - self.footer.length)), len - sent);
+        read            = MIN(self.footer.length - (self.delivered - (self.length - self.footer.length)), len - sent);
         [self.footer getBytes:buffer + sent range:NSMakeRange(self.delivered - (self.length - self.footer.length), read)];
-        sent      += read;
+        sent           += read;
         self.delivered += read;
     }
     return sent;

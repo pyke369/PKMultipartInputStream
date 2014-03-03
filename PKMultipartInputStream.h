@@ -5,7 +5,7 @@
 - (void)addPartWithName:(NSString *)name string:(NSString *)string;
 - (void)addPartWithName:(NSString *)name data:(NSData *)data;
 - (void)addPartWithName:(NSString *)name path:(NSString *)path;
-- (void)addPartWithName:(NSString *)name fileName:(NSString *)fileName path:(NSString *)path;
+- (void)addPartWithName:(NSString *)name filename:(NSString *)filename path:(NSString *)path;
 
 @property (nonatomic, readonly) NSString *boundary;
 @property (nonatomic, readonly) NSUInteger length;

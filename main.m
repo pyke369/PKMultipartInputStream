@@ -46,7 +46,7 @@
     [request setValue:[NSString stringWithFormat:@"%d", [body length]] forHTTPHeaderField:@"Content-Length"];
     [request setHTTPBodyStream:body];
     [request setHTTPMethod:@"POST"];
-    NSURLConnection *upload = [[NSURLConnection alloc] initWithRequest:request delegate:self];
+    [[NSURLConnection alloc] initWithRequest:request delegate:self];
     action.enabled = NO;
     message.text   = @"Starting data post";
 }
@@ -93,7 +93,8 @@
 
 int main(int argc, char **argv)
 {
-    @autoreleasepool {
+    @autoreleasepool
+    {
         int retVal = UIApplicationMain(argc, argv, nil, NSStringFromClass([PKMISDelegate class]));
         return retVal;
     }
