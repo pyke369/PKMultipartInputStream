@@ -46,7 +46,7 @@
     [request setValue:[NSString stringWithFormat:@"%d", [body length]] forHTTPHeaderField:@"Content-Length"];
     [request setHTTPBodyStream:body];
     [request setHTTPMethod:@"POST"];
-    [[NSURLConnection alloc] initWithRequest:request delegate:self];
+    NSURLConnection *upload = [[NSURLConnection alloc] initWithRequest:request delegate:self];
     action.enabled = NO;
     message.text   = @"Starting data post";
 }
@@ -85,7 +85,7 @@
 - (void)applicationDidFinishLaunching:(UIApplication *)application
 {
     window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-    main   = [[PKMISController alloc] retain];
+    main   = [PKMISController alloc];
     [window addSubview:main.view];
     [window makeKeyAndVisible];
 }
@@ -93,8 +93,8 @@
 
 int main(int argc, char **argv)
 {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    int status = UIApplicationMain(argc, argv, nil, @"PKMISDelegate");
-    [pool release];
-    return status;
+    @autoreleasepool {
+        int retVal = UIApplicationMain(argc, argv, nil, NSStringFromClass([PKMISDelegate class]));
+        return retVal;
+    }
 }
