@@ -5,7 +5,7 @@
 #import <MobileCoreServices/UTType.h>
 #import "PKMultipartInputStream.h"
 #define kHeaderStringFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\n\r\n"
-#define kHeaderDataFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+#define kHeaderDataFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"\r\nContent-Type: %@\r\n\r\n"
 #define kHeaderPathFormat @"--%@\r\nContent-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\nContent-Type: %@\r\n\r\n"
 #define kFooterFormat @"--%@--\r\n"
 
@@ -49,10 +49,10 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     [self updateLength];
     return self;
 }
-- (id)initWithName:(NSString *)name boundary:(NSString *)boundary data:(NSData *)data
+- (id)initWithName:(NSString *)name boundary:(NSString *)boundary data:(NSData *)data contentType:(NSString *)contentType
 {
     self               = [super init];
-    self.headers       = [[NSString stringWithFormat:kHeaderDataFormat, boundary, name] dataUsingEncoding:NSUTF8StringEncoding];
+    self.headers       = [[NSString stringWithFormat:kHeaderDataFormat, boundary, name, contentType] dataUsingEncoding:NSUTF8StringEncoding];
     self.headersLength = [self.headers length];
     self.body          = [NSInputStream inputStreamWithData:data];
     self.bodyLength    = [data length];
@@ -142,9 +142,15 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 }
 - (void)addPartWithName:(NSString *)name data:(NSData *)data
 {
-    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary data:data]];
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary data:data contentType:@"application/octet-stream"]];
     [self updateLength];
 }
+- (void)addPartWithName:(NSString *)name data:(NSData *)data contentType:(NSString *)type {
+    
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary data:data contentType:type]];
+    [self updateLength];
+}
+
 - (void)addPartWithName:(NSString *)name path:(NSString *)path
 {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:nil boundary:self.boundary path:path]];
