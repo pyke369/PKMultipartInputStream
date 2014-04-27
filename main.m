@@ -43,7 +43,7 @@
 
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"http://asite.com/upload.php"]];
     [request setValue:[NSString stringWithFormat:@"multipart/form-data; boundary=%@", [body boundary]] forHTTPHeaderField:@"Content-Type"];
-    [request setValue:[NSString stringWithFormat:@"%d", [body length]] forHTTPHeaderField:@"Content-Length"];
+    [request setValue:[NSString stringWithFormat:@"%lu", (unsigned long)[body length]] forHTTPHeaderField:@"Content-Length"];
     [request setHTTPBodyStream:body];
     [request setHTTPMethod:@"POST"];
     [[NSURLConnection alloc] initWithRequest:request delegate:self];
@@ -53,7 +53,7 @@
 - (void)loadView
 {
     self.view = [[UIView alloc] initWithFrame:[[UIScreen mainScreen] applicationFrame]];
-    
+
     action = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     action.frame = CGRectMake(60, 150, 200, 36);
     [action setTitle:@"Start data post" forState:UIControlStateNormal];
@@ -61,7 +61,7 @@
     [action setTitleColor:[UIColor lightGrayColor] forState:UIControlStateDisabled];
     [action addTarget:self action:@selector(upload:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:action];
-    
+
     progress = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     progress.frame = CGRectMake(30, 250, 260, 36);
     [self.view addSubview:progress];
