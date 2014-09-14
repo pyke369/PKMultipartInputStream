@@ -174,13 +174,11 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name boundary:self.boundary data:data contentType:type filename:filename]];
     [self updateLength];
 }
-
 - (void)addPartWithName:(NSString *)name path:(NSString *)path
 {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:nil boundary:self.boundary path:path]];
     [self updateLength];
 }
-
 - (void)addPartWithName:(NSString *)name filename:(NSString *)filename path:(NSString *)path
 {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:filename boundary:self.boundary path:path]];
