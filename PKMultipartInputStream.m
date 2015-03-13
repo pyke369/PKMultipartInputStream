@@ -235,4 +235,5 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 }
 - (void)_scheduleInCFRunLoop:(NSRunLoop *)runLoop forMode:(id)mode {}
 - (void)_setCFClientFlags:(CFOptionFlags)flags callback:(CFReadStreamClientCallBack)callback context:(CFStreamClientContext)context {}
+- (void)removeFromRunLoop:(__unused NSRunLoop *)aRunLoop forMode:(__unused NSString *)mode {}
 @end
