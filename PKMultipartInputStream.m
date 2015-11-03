@@ -138,6 +138,7 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 @end
 
 @implementation PKMultipartInputStream
+@synthesize delegate;
 - (void)updateLength
 {
     self.length = self.footer.length + [[self.parts valueForKeyPath:@"@sum.length"] unsignedIntegerValue];
