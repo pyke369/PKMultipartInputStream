@@ -1,6 +1,8 @@
 // PKMultipartInputStream.h
 // py.kerembellec@gmail.com
 
+#import <Foundation/Foundation.h>
+
 @interface PKMultipartInputStream : NSInputStream
 - (void)addPartWithName:(NSString *)name string:(NSString *)string;
 - (void)addPartWithName:(NSString *)name data:(NSData *)data;
