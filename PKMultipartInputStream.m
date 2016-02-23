@@ -91,6 +91,57 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     [self updateLength];
     return self;
 }
+- (id)initWithHeaders:(NSDictionary *)headers string:(NSString *)string boundary:(NSString *)boundary
+{
+    self = [super init];
+    if (self) {
+        
+        _headers = [self makeHeadersDataFromHeadersDict:headers boundary:boundary];
+        _headersLength = _headers.length;
+        NSData *stringData = [string dataUsingEncoding:NSUTF8StringEncoding];
+        _body = [NSInputStream inputStreamWithData:stringData];
+        _bodyLength = stringData.length;
+        [self updateLength];
+    }
+    return self;
+}
+
+- (id)initWithHeaders:(NSDictionary *)headers path:(NSString *)path boundary:(NSString *)boundary
+{
+    self = [super init];
+    if (self) {
+        
+        _headers = [self makeHeadersDataFromHeadersDict:headers boundary:boundary];
+        _headersLength = _headers.length;
+        _body = [NSInputStream inputStreamWithFileAtPath:path];
+        _bodyLength = [[[[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL] objectForKey:NSFileSize] unsignedIntegerValue];
+        [self updateLength];
+    }
+    return self;
+}
+
+- (NSData *)makeHeadersDataFromHeadersDict:(NSDictionary *)headers boundary:(NSString *)boundary
+{
+    NSMutableString *headersString = [[NSMutableString alloc] initWithFormat:@"--%@", boundary];
+    [self appendNewLine:headersString];
+    
+    for (NSString *key in headers.allKeys) {
+        
+        [headersString appendString:[[NSString alloc] initWithFormat:@"%@: %@", key, headers[key]]];
+        [self appendNewLine:headersString];
+    }
+    
+    [self appendNewLine:headersString];
+    
+    NSData *result = [headersString dataUsingEncoding:NSUTF8StringEncoding];
+    return result;
+}
+
+- (void)appendNewLine:(NSMutableString *)string {
+    
+    [string appendString:@"\r\n"];
+}
+
 - (NSUInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len
 {
     NSUInteger sent = 0, read;
@@ -190,6 +241,19 @@ static NSString * MIMETypeForExtension(NSString * extension) {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:filename boundary:self.boundary stream:stream streamLength:streamLength]];
     [self updateLength];
 }
+
+- (void)addPartWithHeaders:(NSDictionary *)headers string:(NSString *)string
+{
+    [self.parts addObject:[[PKMultipartElement alloc] initWithHeaders:headers string:string boundary:self.boundary]];
+    [self updateLength];
+}
+
+- (void)addPartWithHeaders:(NSDictionary *)headers path:(NSString *)path
+{
+    [self.parts addObject:[[PKMultipartElement alloc] initWithHeaders:headers path:path boundary:self.boundary]];
+    [self updateLength];
+}
+
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len
 {
     NSUInteger sent = 0, read;
