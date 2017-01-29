@@ -71,11 +71,15 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 }
 - (id)initWithName:(NSString *)name filename:(NSString *)filename boundary:(NSString *)boundary path:(NSString *)path
 {
+    return [self initWithName:name filename:filename boundary:boundary path:path contentType:MIMETypeForExtension(path.pathExtension)];
+}
+- (id)initWithName:(NSString *)name filename:(NSString *)filename boundary:(NSString *)boundary path:(NSString *)path contentType:(NSString *)contentType
+{
     if (!filename)
     {
         filename = path.lastPathComponent;
     }
-    self.headers       = [[NSString stringWithFormat:kHeaderPathFormat, boundary, name, filename, MIMETypeForExtension(path.pathExtension)] dataUsingEncoding:NSUTF8StringEncoding];
+    self.headers       = [[NSString stringWithFormat:kHeaderPathFormat, boundary, name, filename, contentType] dataUsingEncoding:NSUTF8StringEncoding];
     self.headersLength = [self.headers length];
     self.body          = [NSInputStream inputStreamWithFileAtPath:path];
     self.bodyLength    = [[[[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL] objectForKey:NSFileSize] unsignedIntegerValue];
@@ -234,6 +238,11 @@ static NSString * MIMETypeForExtension(NSString * extension) {
 - (void)addPartWithName:(NSString *)name filename:(NSString *)filename path:(NSString *)path
 {
     [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:filename boundary:self.boundary path:path]];
+    [self updateLength];
+}
+- (void)addPartWithName:(NSString *)name filename:(NSString *)filename path:(NSString *)path contentType:(NSString *)type
+{
+    [self.parts addObject:[[PKMultipartElement alloc] initWithName:name filename:filename boundary:self.boundary path:path contentType:type]];
     [self updateLength];
 }
 - (void)addPartWithName:(NSString *)name filename:(NSString *)filename stream:(NSInputStream *)stream streamLength:(NSUInteger)streamLength
