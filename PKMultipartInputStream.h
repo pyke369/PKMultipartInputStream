@@ -15,7 +15,7 @@
 - (void)addPartWithHeaders:(NSDictionary *)headers string:(NSString *)string;
 - (void)addPartWithHeaders:(NSDictionary *)headers path:(NSString *)path;
 
-@property (nonatomic, readonly) NSString *boundary;
+@property (nonatomic, readonly, nonnull) NSString *boundary;
 @property (nonatomic, readonly) NSUInteger length;
 
 @end
